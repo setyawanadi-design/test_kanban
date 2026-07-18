@@ -105,3 +105,32 @@ body:not(.light-theme) .add-card-btn { color: #bdc3c7; }
 .help-item { display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; }
 .kbd { background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fff; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,255,255,0.1); }
 body.light-theme .kbd { background: #fff; color: #333; border: 1px solid #ccc; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+
+/* --- Mobile Responsiveness via Media Queries --- */
+@media (max-width: 768px) {
+  /* Hide keyboard shortcut hints inside buttons on mobile to save space */
+  .header-btn span { display: none; }
+
+  /* Make header look cleaner */
+  header { padding: 10px; gap: 8px; height: auto; flex-wrap: wrap; }
+  h1 { font-size: 15px; margin-right: 8px; }
+  .header-actions { flex-wrap: wrap; gap: 4px; }
+  .divider { margin: 0 4px; height: 16px; }
+
+  /* Stack main container layouts vertically */
+  main { flex-direction: column; height: calc(100vh - 53px); overflow-y: auto; gap: 16px; }
+  #board-scroll-area { overflow-x: hidden; overflow-y: visible; flex: none; width: 100%; }
+
+  .board-wrapper { flex-direction: column; align-items: stretch; gap: 16px; min-width: unset; width: 100%; }
+  .board-col { flex: none; width: 100%; height: auto; max-height: 480px; }
+
+  /* Stack information board panel cleanly at the bottom */
+  #sticky-note-panel { width: 100%; height: auto; flex: none; border-top-right-radius: var(--radius); }
+
+  /* Make modals responsive on mobile screens */
+  .modal { width: 90%; max-width: 520px; padding: 16px; }
+  .modal h2 { font-size: 16px; }
+
+  /* Stack shortcut menu grids on mobile */
+  .help-grid { grid-template-columns: 1fr; gap: 12px; }
+}

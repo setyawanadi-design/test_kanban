@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 *.pyo
 board_data.json
+board.db
