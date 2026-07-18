@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document board</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1 id="board-title">Document board</h1>
+  <div class="header-actions">
+    <button class="header-btn" onclick="triggerAddCard()">+ Card <span>(N)</span></button>
+    <button class="header-btn" onclick="addStickyNote()">+ Note <span>(M)</span></button>
+    <div class="divider"></div>
+    <button class="header-btn" onclick="toggleHelp()">? <span>(?)</span></button>
+    <button id="theme-btn" class="header-btn" onclick="toggleTheme()">&#9681; <span>(T)</span></button>
+    <button id="stretch-btn" class="header-btn" onclick="toggleStretch()">&#8596; <span>(S)</span></button>
+    <button class="header-btn" onclick="saveBackup()">&#128190; <span>(Shift+B)</span></button>
+    <button class="header-btn" onclick="document.getElementById('restore-file').click()">&#128194; <span>(Shift+R)</span></button>
+    <input type="file" id="restore-file" accept="application/json" style="display:none" onchange="loadBackup(event)">
+    <button class="header-btn" onclick="exportLog()">&#8681; <span>(Shift+E)</span></button>
+    <button class="header-btn" onclick="openConfig()">&#9881; <span>(C)</span></button>
+  </div>
+</header>
+<main id="main-container">
+  <div id="board-scroll-area"><div id="board"></div></div>
+  <div id="sticky-note-panel">
+    <div class="note-header">Information Board</div>
+    <div id="sticky-notes-list"></div>
+  </div>
+</main>
+
+<div class="overlay" id="help-overlay">
+  <div class="modal" style="width: 600px;">
+    <h2>Keyboard Shortcuts</h2>
+    <div class="help-grid">
+      <div class="help-col">
+        <h3>General Actions</h3>
+        <div class="help-item"><span>Toggle Shortcuts Menu</span> <span class="kbd">?</span></div>
+        <div class="help-item"><span>Add New Card</span> <span class="kbd">N</span></div>
+        <div class="help-item"><span>Add New Sticky Note</span> <span class="kbd">M</span></div>
+        <div class="help-item"><span>Toggle Stretch Mode</span> <span class="kbd">S</span></div>
+        <div class="help-item"><span>Toggle Light/Dark Theme</span> <span class="kbd">T</span></div>
+        <div class="help-item"><span>Open Configuration</span> <span class="kbd">C</span></div>
+        <div class="help-item"><span>Save Backup (Download)</span> <span class="kbd">Shift + B</span></div>
+        <div class="help-item"><span>Restore Backup (Upload)</span> <span class="kbd">Shift + R</span></div>
+        <div class="help-item"><span>Export Action Log (CSV)</span> <span class="kbd">Shift + E</span></div>
+      </div>
+      <div class="help-col">
+        <h3>Card Navigation & Control</h3>
+        <div class="help-item"><span>Select / Focus Cards</span> <span class="kbd">Arrows</span> or <span class="kbd">H J K L</span></div>
+        <div class="help-item"><span>Pick Up / Drop Card</span> <span class="kbd">Space</span></div>
+        <div class="help-item"><span>Edit Selected Card</span> <span class="kbd">E</span></div>
+        <div class="help-item"><span>Delete Selected Card</span> <span class="kbd">Delete</span></div>
+        <div class="help-item"><span>Cancel / Close Menu</span> <span class="kbd">Escape</span></div>
+        <h3>While Typing (New/Edit)</h3>
+        <div class="help-item"><span>Cycle Categories (Pills)</span> <span class="kbd">Alt + &#8592; / &#8594;</span></div>
+        <div class="help-item"><span>Save / Submit</span> <span class="kbd">Enter</span></div>
+        <div class="help-item"><span>New Line in Description</span> <span class="kbd">Shift + Enter</span></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn-secondary" onclick="closeOverlay('help-overlay')">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Configure Board Layout</h2>
+    <label>Board Name</label>
+    <input type="text" id="cfg-title">
+    <h3>Intake Categories (Pills)</h3>
+    <div id="cfg-cat-list"></div>
+    <div class="config-row">
+      <input type="text" id="cfg-new-cat" placeholder="New Category Name">
+      <button class="btn-secondary" onclick="addCategoryDraft()">Add</button>
+    </div>
+    <h3>Tracking Columns</h3>
+    <div id="cfg-track-cols"></div>
+    <div class="config-row">
+      <input type="text" id="cfg-new-track" placeholder="New Tracking Column Name">
+      <button class="btn-secondary" onclick="addColumnDraft()">Add</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeOverlay('overlay')">Cancel</button>
+      <button class="btn-primary" onclick="saveConfig()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="card-edit-overlay">
+  <div class="modal">
+    <h2>Edit Card</h2>
+    <div id="edit-pill-selector" style="margin-bottom: 12px;"></div>
+    <textarea id="edit-card-textarea" style="width:100%; min-height:120px; font-family:inherit; padding:10px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--input-bg); color:var(--input-text); outline:none; resize:vertical;"></textarea>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeOverlay('card-edit-overlay')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditCard()">Save Content</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="note-edit-overlay">
+  <div class="modal">
+    <h2>Edit Note</h2>
+    <textarea id="edit-note-textarea" style="width:100%; min-height:120px; font-family:inherit; padding:10px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--input-bg); color:var(--input-text); outline:none; resize:vertical;"></textarea>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeOverlay('note-edit-overlay')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
