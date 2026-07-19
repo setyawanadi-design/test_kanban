@@ -10,17 +10,17 @@
 <header>
   <h1 id="board-title">Document board</h1>
   <div class="header-actions">
-    <button class="header-btn" onclick="triggerAddCard()">+ Card <span>(N)</span></button>
-    <button class="header-btn" onclick="addStickyNote()">+ Note <span>(M)</span></button>
+    <button class="header-btn readonly-hide" onclick="triggerAddCard()">+ Card <span>(N)</span></button>
+    <button class="header-btn readonly-hide" onclick="addStickyNote()">+ Note <span>(M)</span></button>
     <div class="divider"></div>
     <button class="header-btn" onclick="toggleHelp()">? <span>(?)</span></button>
     <button id="theme-btn" class="header-btn" onclick="toggleTheme()">&#9681; <span>(T)</span></button>
     <button id="stretch-btn" class="header-btn" onclick="toggleStretch()">&#8596; <span>(S)</span></button>
     <button class="header-btn" onclick="saveBackup()">&#128190; <span>(Shift+B)</span></button>
-    <button class="header-btn" onclick="document.getElementById('restore-file').click()">&#128194; <span>(Shift+R)</span></button>
+    <button class="header-btn readonly-hide" onclick="document.getElementById('restore-file').click()">&#128194; <span>(Shift+R)</span></button>
     <input type="file" id="restore-file" accept="application/json" style="display:none" onchange="loadBackup(event)">
     <button class="header-btn" onclick="exportLog()">&#8681; <span>(Shift+E)</span></button>
-    <button class="header-btn" onclick="openConfig()">&#9881; <span>(C)</span></button>
+    <button class="header-btn readonly-hide" onclick="openConfig()">&#9881; <span>(C)</span></button>
   </div>
 </header>
 <main id="main-container">

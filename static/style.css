@@ -134,3 +134,10 @@ body.light-theme .kbd { background: #fff; color: #333; border: 1px solid #ccc; b
   /* Stack shortcut menu grids on mobile */
   .help-grid { grid-template-columns: 1fr; gap: 12px; }
 }
+
+/* --- Read-Only Mode Support --- */
+body.readonly-mode .readonly-hide,
+body.readonly-mode .card-actions,
+body.readonly-mode .add-container {
+  display: none !important;
+}
