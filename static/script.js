@@ -108,7 +108,12 @@ async function post(body) {
   body.version = boardVersion;
   try {
       const res = await fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (res.status === 409) { alert((await res.json()).error); await loadData(); return false; }
+      if (res.status === 409) {
+          const errData = await res.json();
+          alert(errData.error || errData.detail || "Syncing layouts.");
+          await loadData();
+          return false;
+      }
       if (res.ok) { boardVersion = (await res.json()).new_version; return true; }
       return false;
   } catch (e) { return false; }
@@ -594,4 +599,24 @@ async function saveConfig() {
   const ok = await post({ action: 'configure', board_title: title, columns: [columns.find(c => c.is_intake), ...draftColumns], categories: draftCategories });
   if (ok) { closeOverlay('overlay'); await loadData(); }
 }
+
+// Initialize Real-time WebSockets Synchronization (reconnects automatically if disconnected)
+function initWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = protocol + '//' + window.location.host + '/ws';
+  const ws = new WebSocket(wsUrl);
+
+  ws.onmessage = (event) => {
+    if (event.data === 'reload') {
+      console.log('Real-time synchronization received: reloading board data...');
+      loadData();
+    }
+  };
+
+  ws.onclose = () => {
+    setTimeout(initWebSocket, 3000);
+  };
+}
+
+initWebSocket();
 loadData();

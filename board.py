@@ -8,7 +8,7 @@ import io
 import csv
 from typing import List, Optional
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi import FastAPI, HTTPException, Response, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,6 +24,40 @@ app = FastAPI(title="Document Board API")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
+
+# --- WebSocket Connection Manager ---
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections[:]:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                if connection in self.active_connections:
+                    self.active_connections.remove(connection)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Maintain active connection; discard incoming client messages
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 # --- Pydantic Models for Data Sanitization & Input Validation ---
 
@@ -135,6 +169,9 @@ async def post_data(body: PostDataModel):
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported action: {action}")
 
+    # Broadcast layout/card change event to all other clients in real-time!
+    await manager.broadcast("reload")
+
     return {"ok": True, "new_version": new_version}
 
 @app.get("/api/export")
@@ -174,6 +211,10 @@ async def restore_data(request: Request):
         raise HTTPException(status_code=420, detail="Invalid backup file layout")
 
     database.restore_backup(body)
+
+    # Broadcast full restore change to all other active clients in real-time
+    await manager.broadcast("reload")
+
     return {"ok": True}
 
 # Mount static files handler last so that API routes take precedence
