@@ -23,6 +23,7 @@ let activeEditCardId = null;
 let activeEditCategoryId = null;
 let activeEditNoteId = null;
 let kbDraggingCard = null;
+let currentView = 'column'; // 'column' or 'table'
 
 let isStretched = localStorage.getItem('boardStretched') === 'true';
 let isLight = localStorage.getItem('boardLightTheme') === 'true';
@@ -37,6 +38,15 @@ function applyStretchUI() {
     const main = document.getElementById('main-container');
     if(wrap) wrap.classList.toggle('stretched', isStretched);
     if(main) main.classList.toggle('stretched-mode', isStretched);
+}
+
+function toggleView() {
+  currentView = (currentView === 'column') ? 'table' : 'column';
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) {
+    btn.textContent = (currentView === 'column') ? '☰ Table View' : '🎚️ Board View';
+  }
+  render();
 }
 
 // Modal Locking Logic
@@ -69,120 +79,6 @@ function triggerAddCard() {
     if (row && row.classList.contains('open') && input) input.focus();
     else if (btn) btn.click();
 }
-
-// Global Keyboard Router
-document.addEventListener('keydown', async (e) => {
-    const isInput = ['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName);
-    const hasOverlayOpen = document.body.classList.contains('modal-open');
-
-    if (e.key === 'Escape') {
-        if(hasOverlayOpen) {
-            document.querySelectorAll('.overlay.open').forEach(el => el.classList.remove('open'));
-            document.body.classList.remove('modal-open');
-            activeEditCardId = null;
-            activeEditCategoryId = null;
-            activeEditNoteId = null;
-        }
-        return;
-    }
-
-    if (isInput) return; // Ignore hotkeys when typing
-
-    const key = e.key.toLowerCase();
-
-    // Global Menu Toggles
-    if (!hasOverlayOpen && !kbDraggingCard) {
-        if (key === '?') { e.preventDefault(); toggleHelp(); return; }
-        if (key === 'n') { e.preventDefault(); triggerAddCard(); return; }
-        if (key === 'm') { e.preventDefault(); addStickyNote(); return; }
-        if (key === 's') { e.preventDefault(); toggleStretch(); return; }
-        if (key === 't') { e.preventDefault(); toggleTheme(); return; }
-        if (key === 'c') { e.preventDefault(); openConfig(); return; }
-
-        if (e.shiftKey && key === 'b') { e.preventDefault(); saveBackup(); return; }
-        if (e.shiftKey && key === 'r') { e.preventDefault(); document.getElementById('restore-file').click(); return; }
-        if (e.shiftKey && key === 'e') { e.preventDefault(); exportLog(); return; }
-    }
-
-    // Card Focus & Drag Navigation Engine
-    if (hasOverlayOpen) return;
-
-    const active = document.activeElement;
-    const isCard = active.classList.contains('card');
-    const isDirKey = ['arrowup','arrowdown','arrowleft','arrowright','h','j','k','l'].includes(key);
-
-    if (!kbDraggingCard && isDirKey) {
-        e.preventDefault();
-        const allCards = Array.from(document.querySelectorAll('.card'));
-        if (allCards.length === 0) return;
-
-        if (!isCard) { allCards[0].focus(); return; }
-
-        if (['j', 'arrowdown'].includes(key)) {
-            const next = active.nextElementSibling;
-            if (next && next.classList.contains('card')) next.focus();
-        } else if (['k', 'arrowup'].includes(key)) {
-            const prev = active.previousElementSibling;
-            if (prev && prev.classList.contains('card')) prev.focus();
-        } else if (['l', 'arrowright'].includes(key)) {
-            const cols = Array.from(document.querySelectorAll('.board-col'));
-            let idx = cols.indexOf(active.closest('.board-col'));
-            while(idx < cols.length - 1) {
-                idx++;
-                const c = cols[idx].querySelector('.card');
-                if(c) { c.focus(); break; }
-            }
-        } else if (['h', 'arrowleft'].includes(key)) {
-            const cols = Array.from(document.querySelectorAll('.board-col'));
-            let idx = cols.indexOf(active.closest('.board-col'));
-            while(idx > 0) {
-                idx--;
-                const c = cols[idx].querySelector('.card');
-                if(c) { c.focus(); break; }
-            }
-        }
-        return;
-    }
-
-    if (isCard && !kbDraggingCard) {
-        if (key === 'e') { e.preventDefault(); if (!isReadOnly) active.querySelector('.edit-btn').click(); }
-        if (key === 'delete' || key === 'backspace') { e.preventDefault(); if (!isReadOnly) active.querySelector('.del-btn').click(); }
-        if (key === ' ' || key === 'spacebar') { e.preventDefault(); if (!isReadOnly) { kbDraggingCard = active; active.classList.add('keyboard-dragging'); } }
-    } else if (kbDraggingCard) {
-        e.preventDefault();
-        if (key === 'enter' || key === ' ' || key === 'spacebar') {
-            kbDraggingCard.classList.remove('keyboard-dragging');
-            const newColId = kbDraggingCard.closest('.board-col').dataset.colId;
-            const cardId = kbDraggingCard.dataset.id;
-
-            const domCards = document.querySelectorAll('.card');
-            const newCardsArray = [];
-            domCards.forEach(el => {
-                const cObj = cards.find(x => x.id === el.dataset.id);
-                if (cObj) { if (cObj.id === cardId) cObj.column_id = newColId; newCardsArray.push(cObj); }
-            }); cards = newCardsArray;
-            await post({ action: 'update_cards', cards: cards }); render();
-            setTimeout(() => { const el = document.querySelector(`[data-id='${cardId}']`); if(el) el.focus(); }, 50);
-            kbDraggingCard = null; return;
-        }
-        const currentZone = kbDraggingCard.closest('.drop-zone');
-        const currentCol = kbDraggingCard.closest('.board-col');
-
-        if (['arrowleft', 'h'].includes(key)) {
-            const prevCol = currentCol.previousElementSibling;
-            if (prevCol) { prevCol.querySelector('.drop-zone').appendChild(kbDraggingCard); kbDraggingCard.focus(); }
-        } else if (['arrowright', 'l'].includes(key)) {
-            const nextCol = currentCol.nextElementSibling;
-            if (nextCol) { nextCol.querySelector('.drop-zone').appendChild(kbDraggingCard); kbDraggingCard.focus(); }
-        } else if (['arrowup', 'k'].includes(key)) {
-            const prevCard = kbDraggingCard.previousElementSibling;
-            if (prevCard && prevCard.classList.contains('card')) { currentZone.insertBefore(kbDraggingCard, prevCard); kbDraggingCard.focus(); }
-        } else if (['arrowdown', 'j'].includes(key)) {
-            const nextCard = kbDraggingCard.nextElementSibling;
-            if (nextCard && nextCard.classList.contains('card')) { currentZone.insertBefore(kbDraggingCard, nextCard.nextElementSibling); kbDraggingCard.focus(); }
-        }
-    }
-});
 
 function genId(prefix) { return prefix + '-' + Math.random().toString(36).substring(2, 10); }
 function getFormattedDate() {
@@ -284,6 +180,88 @@ function addStickyNote() {
 
 function render() {
   const board = document.getElementById('board'); board.innerHTML = '';
+
+  if (currentView === 'table') {
+    // Render clean, beautiful Data Table View
+    board.className = 'board-table-container';
+
+    const table = document.createElement('table');
+    table.className = 'board-table';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr>
+        <th>Task Details</th>
+        <th>Column / Status</th>
+        <th>Category</th>
+        <th>Created At</th>
+        ${!isReadOnly ? '<th>Actions</th>' : ''}
+      </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    if (cards.length === 0) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td colspan="${!isReadOnly ? 5 : 4}" style="text-align: center; color: var(--meta-text); padding: 24px;">No tasks created yet. Click "+ Card" above to add some!</td>`;
+      tbody.appendChild(row);
+    } else {
+      cards.forEach(c => {
+        const col = columns.find(x => x.id === c.column_id);
+        const cat = categories.find(x => x.id === c.category_id);
+
+        const row = document.createElement('tr');
+
+        // Task text with title and description lines
+        const lines = c.text.split('\n');
+        const titleText = lines[0];
+        const descText = lines.length > 1 ? `<div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">${lines.slice(1).join('<br>')}</div>` : '';
+
+        const statusBadge = col ? `<span class="status-badge" style="background-color: ${col.color}">${col.label}</span>` : '';
+        const catPill = cat ? `<span class="cat-pill" style="background-color: ${cat.color}">${cat.label}</span>` : '';
+        const timeStr = c.created_at ? c.created_at.substring(0, 16) : '';
+
+        let actionsTd = '';
+        if (!isReadOnly) {
+          actionsTd = `
+            <td>
+              <button class="card-btn edit-btn" style="margin-right: 4px;">Edit</button>
+              <button class="card-btn del-btn">Delete</button>
+            </td>
+          `;
+        }
+
+        row.innerHTML = `
+          <td><div style="font-weight: 600;">${titleText}</div>${descText}</td>
+          <td>${statusBadge}</td>
+          <td>${catPill}</td>
+          <td>${timeStr}</td>
+          ${actionsTd}
+        `;
+
+        // Wire actions
+        if (!isReadOnly) {
+          const editB = row.querySelector('.edit-btn');
+          const delB = row.querySelector('.del-btn');
+          if (editB) editB.onclick = () => openEditCard(c.id);
+          if (delB) {
+            delB.onclick = async () => {
+              cards = cards.filter(x => x.id !== c.id);
+              const ok = await post({ action: 'delete', card: c.text, column_id: c.column_id, card_id: c.id });
+              if (ok) render();
+            };
+          }
+        }
+
+        tbody.appendChild(row);
+      });
+    }
+    table.appendChild(tbody);
+    board.appendChild(table);
+    return;
+  }
+
+  // Classic Column View
   board.className = 'board-wrapper' + (isStretched ? ' stretched' : '');
 
   columns.forEach(colData => {
@@ -373,6 +351,120 @@ function renderCardsInto(container, columnData) {
     container.appendChild(cardEl);
   });
 }
+
+// Global Keyboard Router
+document.addEventListener('keydown', async (e) => {
+    const isInput = ['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName);
+    const hasOverlayOpen = document.body.classList.contains('modal-open');
+
+    if (e.key === 'Escape') {
+        if(hasOverlayOpen) {
+            document.querySelectorAll('.overlay.open').forEach(el => el.classList.remove('open'));
+            document.body.classList.remove('modal-open');
+            activeEditCardId = null;
+            activeEditCategoryId = null;
+            activeEditNoteId = null;
+        }
+        return;
+    }
+
+    if (isInput) return; // Ignore hotkeys when typing
+
+    const key = e.key.toLowerCase();
+
+    // Global Menu Toggles
+    if (!hasOverlayOpen && !kbDraggingCard) {
+        if (key === '?') { e.preventDefault(); toggleHelp(); return; }
+        if (key === 'n') { e.preventDefault(); triggerAddCard(); return; }
+        if (key === 'm') { e.preventDefault(); addStickyNote(); return; }
+        if (key === 's') { e.preventDefault(); toggleStretch(); return; }
+        if (key === 't') { e.preventDefault(); toggleTheme(); return; }
+        if (key === 'c') { e.preventDefault(); openConfig(); return; }
+
+        if (e.shiftKey && key === 'b') { e.preventDefault(); saveBackup(); return; }
+        if (e.shiftKey && key === 'r') { e.preventDefault(); document.getElementById('restore-file').click(); return; }
+        if (e.shiftKey && key === 'e') { e.preventDefault(); exportLog(); return; }
+    }
+
+    // Card Focus & Drag Navigation Engine
+    if (hasOverlayOpen || currentView === 'table') return; // Disable keyboard focus layout movement in table mode
+
+    const active = document.activeElement;
+    const isCard = active.classList.contains('card');
+    const isDirKey = ['arrowup','arrowdown','arrowleft','arrowright','h','j','k','l'].includes(key);
+
+    if (!kbDraggingCard && isDirKey) {
+        e.preventDefault();
+        const allCards = Array.from(document.querySelectorAll('.card'));
+        if (allCards.length === 0) return;
+
+        if (!isCard) { allCards[0].focus(); return; }
+
+        if (['j', 'arrowdown'].includes(key)) {
+            const next = active.nextElementSibling;
+            if (next && next.classList.contains('card')) next.focus();
+        } else if (['k', 'arrowup'].includes(key)) {
+            const prev = active.previousElementSibling;
+            if (prev && prev.classList.contains('card')) prev.focus();
+        } else if (['l', 'arrowright'].includes(key)) {
+            const cols = Array.from(document.querySelectorAll('.board-col'));
+            let idx = cols.indexOf(active.closest('.board-col'));
+            while(idx < cols.length - 1) {
+                idx++;
+                const c = cols[idx].querySelector('.card');
+                if(c) { c.focus(); break; }
+            }
+        } else if (['h', 'arrowleft'].includes(key)) {
+            const cols = Array.from(document.querySelectorAll('.board-col'));
+            let idx = cols.indexOf(active.closest('.board-col'));
+            while(idx > 0) {
+                idx--;
+                const c = cols[idx].querySelector('.card');
+                if(c) { c.focus(); break; }
+            }
+        }
+        return;
+    }
+
+    if (isCard && !kbDraggingCard) {
+        if (key === 'e') { e.preventDefault(); if (!isReadOnly) active.querySelector('.edit-btn').click(); }
+        if (key === 'delete' || key === 'backspace') { e.preventDefault(); if (!isReadOnly) active.querySelector('.del-btn').click(); }
+        if (key === ' ' || key === 'spacebar') { e.preventDefault(); if (!isReadOnly) { kbDraggingCard = active; active.classList.add('keyboard-dragging'); } }
+    } else if (kbDraggingCard) {
+        e.preventDefault();
+        if (key === 'enter' || key === ' ' || key === 'spacebar') {
+            kbDraggingCard.classList.remove('keyboard-dragging');
+            const newColId = kbDraggingCard.closest('.board-col').dataset.colId;
+            const cardId = kbDraggingCard.dataset.id;
+
+            const domCards = document.querySelectorAll('.card');
+            const newCardsArray = [];
+            domCards.forEach(el => {
+                const cObj = cards.find(x => x.id === el.dataset.id);
+                if (cObj) { if (cObj.id === cardId) cObj.column_id = newColId; newCardsArray.push(cObj); }
+            }); cards = newCardsArray;
+            await post({ action: 'update_cards', cards: cards }); render();
+            setTimeout(() => { const el = document.querySelector(`[data-id='${cardId}']`); if(el) el.focus(); }, 50);
+            kbDraggingCard = null; return;
+        }
+        const currentZone = kbDraggingCard.closest('.drop-zone');
+        const currentCol = kbDraggingCard.closest('.board-col');
+
+        if (['arrowleft', 'h'].includes(key)) {
+            const prevCol = currentCol.previousElementSibling;
+            if (prevCol) { prevCol.querySelector('.drop-zone').appendChild(kbDraggingCard); kbDraggingCard.focus(); }
+        } else if (['arrowright', 'l'].includes(key)) {
+            const nextCol = currentCol.nextElementSibling;
+            if (nextCol) { nextCol.querySelector('.drop-zone').appendChild(kbDraggingCard); kbDraggingCard.focus(); }
+        } else if (['arrowup', 'k'].includes(key)) {
+            const prevCard = kbDraggingCard.previousElementSibling;
+            if (prevCard && prevCard.classList.contains('card')) { currentZone.insertBefore(kbDraggingCard, prevCard); kbDraggingCard.focus(); }
+        } else if (['arrowdown', 'j'].includes(key)) {
+            const nextCard = kbDraggingCard.nextElementSibling;
+            if (nextCard && nextCard.classList.contains('card')) { currentZone.insertBefore(kbDraggingCard, nextCard.nextElementSibling); kbDraggingCard.focus(); }
+        }
+    }
+});
 
 function renderEditPills() {
     const container = document.getElementById('edit-pill-selector');

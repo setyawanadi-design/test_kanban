@@ -8,7 +8,10 @@
 </head>
 <body>
 <header>
-  <h1 id="board-title">Document board</h1>
+  <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+    <h1 id="board-title">Document board</h1>
+    <button id="view-toggle-btn" class="header-btn" onclick="toggleView()" style="background: var(--btn-action-bg); padding: 0 12px; font-size: 13px;">☰ Table View</button>
+  </div>
   <div class="header-actions">
     <button class="header-btn readonly-hide" onclick="triggerAddCard()">+ Card <span>(N)</span></button>
     <button class="header-btn readonly-hide" onclick="addStickyNote()">+ Note <span>(M)</span></button>
