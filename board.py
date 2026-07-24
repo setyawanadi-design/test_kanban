@@ -78,6 +78,7 @@ class CardModel(BaseModel):
     column_id: str = Field(..., min_length=1)
     category_id: str = Field(..., min_length=1)
     created_at: str
+    alarm_time: Optional[str] = None
 
 class NoteModel(BaseModel):
     id: str = Field(..., min_length=1)
@@ -92,6 +93,7 @@ class PostDataModel(BaseModel):
     column_id: Optional[str] = None
     category_id: Optional[str] = None
     created_at: Optional[str] = None
+    alarm_time: Optional[str] = None
 
     # update_cards action
     cards: Optional[List[CardModel]] = None
@@ -139,7 +141,7 @@ async def post_data(body: PostDataModel):
             raise HTTPException(status_code=420, detail="Missing required fields for create action")
         card_id = "c-" + os.urandom(4).hex()
         created_at = body.created_at if body.created_at else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        new_version = database.add_card(card_id, body.card, body.column_id, body.category_id, created_at)
+        new_version = database.add_card(card_id, body.card, body.column_id, body.category_id, created_at, body.alarm_time)
 
     elif action == "update_cards":
         if body.cards is None:

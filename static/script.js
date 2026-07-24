@@ -25,6 +25,12 @@ let activeEditNoteId = null;
 let kbDraggingCard = null;
 let currentView = 'column'; // 'column' or 'table'
 
+// Track triggered card alarm IDs for this session to prevent spamming duplicate alarms
+const triggeredAlarms = new Set();
+
+// Track last time the constant pending tasks reminder was shown
+let lastReminderTime = 0;
+
 let isStretched = localStorage.getItem('boardStretched') === 'true';
 let isLight = localStorage.getItem('boardLightTheme') === 'true';
 applyThemeUI();
@@ -199,6 +205,7 @@ function render() {
         <th>Task Details</th>
         <th>Column / Status</th>
         <th>Category</th>
+        <th>Alarm Time</th>
         <th>Created At</th>
         ${!isReadOnly ? '<th>Actions</th>' : ''}
       </tr>
@@ -208,7 +215,7 @@ function render() {
     const tbody = document.createElement('tbody');
     if (cards.length === 0) {
       const row = document.createElement('tr');
-      row.innerHTML = `<td colspan="${!isReadOnly ? 5 : 4}" style="text-align: center; color: var(--meta-text); padding: 24px;">No tasks created yet. Click "+ Card" above to add some!</td>`;
+      row.innerHTML = `<td colspan="${!isReadOnly ? 6 : 5}" style="text-align: center; color: var(--meta-text); padding: 24px;">No tasks created yet. Click "+ Card" above to add some!</td>`;
       tbody.appendChild(row);
     } else {
       cards.forEach(c => {
@@ -225,6 +232,7 @@ function render() {
         const statusBadge = col ? `<span class="status-badge" style="background-color: ${col.color}">${col.label}</span>` : '';
         const catPill = cat ? `<span class="cat-pill" style="background-color: ${cat.color}">${cat.label}</span>` : '';
         const timeStr = c.created_at ? c.created_at.substring(0, 16) : '';
+        const alarmStr = c.alarm_time ? `⏰ ${c.alarm_time.replace('T', ' ')}` : '<span style="color: var(--meta-text);">None</span>';
 
         let actionsTd = '';
         if (!isReadOnly) {
@@ -240,6 +248,7 @@ function render() {
           <td><div style="font-weight: 600;">${titleText}</div>${descText}</td>
           <td>${statusBadge}</td>
           <td>${catPill}</td>
+          <td>${alarmStr}</td>
           <td>${timeStr}</td>
           ${actionsTd}
         `;
@@ -301,17 +310,35 @@ function render() {
             selectedPillId = categories[idx].id; renderPills();
         };
 
+        const alarmInputLabel = document.createElement('label');
+        alarmInputLabel.style.fontSize = '11px';
+        alarmInputLabel.style.color = '#7f8c8d';
+        alarmInputLabel.style.marginTop = '8px';
+        alarmInputLabel.textContent = 'Set Alarm (Optional)';
+
+        const alarmInput = document.createElement('input');
+        alarmInput.type = 'datetime-local';
+        alarmInput.className = 'add-card-alarm';
+        alarmInput.style.width = '100%';
+        alarmInput.style.margin = '4px 0 8px 0';
+        alarmInput.style.padding = '6px';
+        alarmInput.style.borderRadius = '4px';
+        alarmInput.style.border = '1px solid rgba(0,0,0,0.15)';
+        alarmInput.style.fontFamily = 'inherit';
+        alarmInput.style.fontSize = '13px';
+
         const input = document.createElement('textarea'); input.placeholder = 'Task title...\n(Shift+Enter for desc)';
         const btnGroup = document.createElement('div'); btnGroup.className = 'btn-group';
         const goBtn = document.createElement('button'); goBtn.textContent = 'Add';
         const cancelBtn = document.createElement('button'); cancelBtn.textContent = 'Cancel'; cancelBtn.className = 'btn-cancel';
 
-        const closeAdd = () => { addRow.classList.remove('open'); addBtn.style.display = 'block'; input.value = ''; };
+        const closeAdd = () => { addRow.classList.remove('open'); addBtn.style.display = 'block'; input.value = ''; alarmInput.value = ''; };
         const doAdd = async () => {
           const val = input.value.trim(); if (!val) { closeAdd(); return; }
           const id = genId('card'); const ts = getFormattedDate();
-          cards.push({ id, text: val, column_id: colData.id, category_id: selectedPillId, created_at: ts }); closeAdd();
-          const ok = await post({ action: 'create', card: val, column_id: colData.id, category_id: selectedPillId, created_at: ts }); if (ok) render();
+          const alarmVal = alarmInput.value ? alarmInput.value : null;
+          cards.push({ id, text: val, column_id: colData.id, category_id: selectedPillId, created_at: ts, alarm_time: alarmVal }); closeAdd();
+          const ok = await post({ action: 'create', card: val, column_id: colData.id, category_id: selectedPillId, created_at: ts, alarm_time: alarmVal }); if (ok) render();
         };
 
         goBtn.onclick = doAdd; cancelBtn.onclick = closeAdd;
@@ -323,7 +350,7 @@ function render() {
         });
         addBtn.onclick = () => { addBtn.style.display = 'none'; addRow.classList.add('open'); input.focus(); };
         btnGroup.appendChild(cancelBtn); btnGroup.appendChild(goBtn);
-        addRow.appendChild(pillHeader); addRow.appendChild(pillSelector); addRow.appendChild(input); addRow.appendChild(btnGroup);
+        addRow.appendChild(pillHeader); addRow.appendChild(pillSelector); addRow.appendChild(input); addRow.appendChild(alarmInputLabel); addRow.appendChild(alarmInput); addRow.appendChild(btnGroup);
         addContainer.appendChild(addBtn); addContainer.appendChild(addRow); col.appendChild(addContainer);
     }
     setupDropZone(zone, colData.id); renderCardsInto(zone, colData); col.appendChild(zone); board.appendChild(col);
@@ -339,6 +366,22 @@ function renderCardsInto(container, columnData) {
     const lines = c.text.split('\n');
     const titleEl = document.createElement('div'); titleEl.style.fontWeight = 'bold'; titleEl.textContent = lines[0]; cardEl.appendChild(titleEl);
     if (lines.length > 1) { const descEl = document.createElement('div'); descEl.style.fontSize = '12px'; descEl.style.marginTop = '6px'; descEl.style.opacity = '0.9'; descEl.textContent = lines.slice(1).join('\n'); cardEl.appendChild(descEl); }
+
+    // Render alarm indicator inside card if present
+    if (c.alarm_time) {
+        const alarmIndicator = document.createElement('div');
+        alarmIndicator.style.fontSize = '11px';
+        alarmIndicator.style.marginTop = '6px';
+        alarmIndicator.style.color = '#fff';
+        alarmIndicator.style.fontWeight = 'bold';
+        alarmIndicator.style.background = 'rgba(0,0,0,0.2)';
+        alarmIndicator.style.padding = '2px 6px';
+        alarmIndicator.style.borderRadius = '4px';
+        alarmIndicator.style.display = 'inline-block';
+        alarmIndicator.innerHTML = `⏰ ${c.alarm_time.replace('T', ' ')}`;
+        cardEl.appendChild(alarmIndicator);
+    }
+
     const footerEl = document.createElement('div'); footerEl.className = 'card-footer';
     const timeEl = document.createElement('span'); timeEl.textContent = c.created_at ? c.created_at.substring(0, 16) : ''; footerEl.appendChild(timeEl);
 
@@ -496,12 +539,19 @@ document.getElementById('edit-card-textarea').addEventListener('keydown', e => {
 function openEditCard(id) {
     if (isReadOnly) return;
     activeEditCardId = id; const cardObj = cards.find(x => x.id === id); activeEditCategoryId = cardObj.category_id;
-    renderEditPills(); document.getElementById('edit-card-textarea').value = cardObj.text;
+    renderEditPills();
+    document.getElementById('edit-card-textarea').value = cardObj.text;
+    document.getElementById('edit-card-alarm').value = cardObj.alarm_time || '';
     openOverlay('card-edit-overlay', 'edit-card-textarea');
 }
 async function saveEditCard() {
     if (isReadOnly || !activeEditCardId) return; const val = document.getElementById('edit-card-textarea').value.trim();
-    if(val) { const cardObj = cards.find(x => x.id === activeEditCardId); cardObj.text = val; cardObj.category_id = activeEditCategoryId; }
+    if(val) {
+        const cardObj = cards.find(x => x.id === activeEditCardId);
+        cardObj.text = val;
+        cardObj.category_id = activeEditCategoryId;
+        cardObj.alarm_time = document.getElementById('edit-card-alarm').value || null;
+    }
     closeOverlay('card-edit-overlay'); await post({ action: 'update_cards', cards: cards }); render();
 }
 
@@ -599,6 +649,53 @@ async function saveConfig() {
   const ok = await post({ action: 'configure', board_title: title, columns: [columns.find(c => c.is_intake), ...draftColumns], categories: draftCategories });
   if (ok) { closeOverlay('overlay'); await loadData(); }
 }
+
+// Helper to trigger system push notification & visual fallback alert
+function sendNotification(title, message) {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification(title, { body: message });
+    } else {
+        alert(`${title.toUpperCase()}\n\n${message}`);
+    }
+}
+
+// Repeating Notification & Alarm Background Engine (Runs every 10 seconds)
+function runNotificationEngine() {
+    const now = new Date();
+
+    // 1. Check Card Alarms
+    cards.forEach(c => {
+        // Alarms only apply to pending tasks (not in Done column)
+        if (c.alarm_time && c.column_id !== 'col_done') {
+            const alarmDate = new Date(c.alarm_time);
+            // If the current time is greater than or equal to the alarm time
+            if (now >= alarmDate && !triggeredAlarms.has(c.id)) {
+                triggeredAlarms.add(c.id);
+                const taskTitle = c.text.split('\n')[0];
+                sendNotification("Task Alarm triggered!", `Remember to complete your task: "${taskTitle}"`);
+            }
+        }
+    });
+
+    // 2. Check Constant/Repeating Pending Tasks Reminder
+    // We remind the user every 3 minutes (180,000 ms) if they have unfinished cards
+    const currentTimeMs = now.getTime();
+    if (currentTimeMs - lastReminderTime >= 180000) {
+        const pendingCards = cards.filter(c => c.column_id !== 'col_done');
+        if (pendingCards.length > 0) {
+            lastReminderTime = currentTimeMs;
+            sendNotification("Tasks Reminder", `You have ${pendingCards.length} outstanding task(s) left on your Kanban board! Don't forget to check them out.`);
+        }
+    }
+}
+
+// Request desktop notification permission on load
+if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission();
+}
+
+// Run the repeating alarm engine every 10 seconds
+setInterval(runNotificationEngine, 10000);
 
 // Initialize Real-time WebSockets Synchronization (reconnects automatically if disconnected)
 function initWebSocket() {

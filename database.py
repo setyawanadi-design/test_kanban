@@ -60,7 +60,8 @@ def init_db():
         column_id TEXT,
         category_id TEXT,
         created_at TEXT,
-        position INTEGER
+        position INTEGER,
+        alarm_time TEXT
     )
     """)
 
@@ -81,6 +82,12 @@ def init_db():
         detail TEXT
     )
     """)
+
+    # Run DB migration for existing databases to add `alarm_time` column safely
+    try:
+        cursor.execute("ALTER TABLE cards ADD COLUMN alarm_time TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     # Seed Default Data if empty
     cursor.execute("SELECT COUNT(*) FROM settings")
@@ -132,7 +139,7 @@ def get_board_data():
         })
 
     # Cards
-    cursor.execute("SELECT id, text, column_id, category_id, created_at FROM cards ORDER BY position ASC")
+    cursor.execute("SELECT id, text, column_id, category_id, created_at, alarm_time FROM cards ORDER BY position ASC")
     cards_list = [dict(r) for r in cursor.fetchall()]
 
     # Notes
@@ -172,7 +179,7 @@ def get_version():
     conn.close()
     return version
 
-def add_card(card_id, text, column_id, category_id, created_at):
+def add_card(card_id, text, column_id, category_id, created_at, alarm_time=None):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -181,9 +188,9 @@ def add_card(card_id, text, column_id, category_id, created_at):
     max_pos = cursor.fetchone()[0]
 
     cursor.execute("""
-    INSERT INTO cards (id, text, column_id, category_id, created_at, position)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (card_id, text, column_id, category_id, created_at, max_pos + 1))
+    INSERT INTO cards (id, text, column_id, category_id, created_at, position, alarm_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (card_id, text, column_id, category_id, created_at, max_pos + 1, alarm_time))
 
     # Log event
     cursor.execute("""
@@ -222,9 +229,9 @@ def update_cards_batch(cards):
     cursor.execute("DELETE FROM cards")
     for idx, card in enumerate(cards):
         cursor.execute("""
-        INSERT INTO cards (id, text, column_id, category_id, created_at, position)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (card["id"], card["text"], card["column_id"], card["category_id"], card["created_at"], idx))
+        INSERT INTO cards (id, text, column_id, category_id, created_at, position, alarm_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (card["id"], card["text"], card["column_id"], card["category_id"], card["created_at"], idx, card.get("alarm_time")))
 
     # Log event
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -316,8 +323,8 @@ def restore_backup(data):
 
     # Restore Cards
     for idx, card in enumerate(data.get("cards", [])):
-        cursor.execute("INSERT INTO cards (id, text, column_id, category_id, created_at, position) VALUES (?, ?, ?, ?, ?, ?)",
-                       (card["id"], card["text"], card["column_id"], card["category_id"], card["created_at"], idx))
+        cursor.execute("INSERT INTO cards (id, text, column_id, category_id, created_at, position, alarm_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (card["id"], card["text"], card["column_id"], card["category_id"], card["created_at"], idx, card.get("alarm_time")))
 
     # Restore Notes
     for idx, note in enumerate(data.get("notes", [])):

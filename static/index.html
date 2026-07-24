@@ -96,6 +96,10 @@
     <h2>Edit Card</h2>
     <div id="edit-pill-selector" style="margin-bottom: 12px;"></div>
     <textarea id="edit-card-textarea" style="width:100%; min-height:120px; font-family:inherit; padding:10px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--input-bg); color:var(--input-text); outline:none; resize:vertical;"></textarea>
+
+    <label style="font-size: 11px; color: #7f8c8d; margin-top: 10px; display: block;">Set Alarm Time (Optional)</label>
+    <input type="datetime-local" id="edit-card-alarm" style="width: 100%; margin-top: 4px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-subtle); background: var(--input-bg); color: var(--input-text); outline: none;">
+
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeOverlay('card-edit-overlay')">Cancel</button>
       <button class="btn-primary" onclick="saveEditCard()">Save Content</button>
