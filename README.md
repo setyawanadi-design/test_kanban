@@ -19,6 +19,8 @@ We completely migrated the application from a raw, single-file proof-of-concept 
    Built using **FastAPI**, providing superior routing, asynchronous request processing, automatic error handling, and high throughput.
 4. **Strict Input Validation & Data Sanitization**:
    We added robust **Pydantic Models** that strictly validate and sanitize incoming payloads before writing anything to the database—safeguarding against malformed JSON or injection attacks.
+5. **Real-Time Board Syncing (WebSockets)**:
+   Built-in `/ws` connection broadcast layer synchronizes collaborative coworkers' screens in real-time instantly without any polling!
 
 ---
 
@@ -79,7 +81,7 @@ If your repository is stored on GitHub, you can securely access and run it insid
    ```
 4. Find the **Ports** tab in the bottom panel.
 5. Right-click on port `8825` -> **Port Visibility** -> Select **Public**.
-6. Copy the provided HTTPS link (e.g., `https://username-codespace-xyz-8825.app.github.dev`) and share it with your colleague!
+6. Copy the provided HTTPS link (e.g., `https://username-codespace-xyz-8825.app.github.dev`) and share it with your coworker!
 
 ### Option B: PythonAnywhere (Easiest Persistent Hosting)
 PythonAnywhere offers a perpetual free beginner tier with zero setup cost:
@@ -105,3 +107,33 @@ Deploy your containerized board directly onto Hugging Face for free:
    CMD ["python", "board.py", "--host", "0.0.0.0", "--port", "7860", "--no-browser"]
    ```
 5. Hugging Face will automatically build and host your board permanently!
+
+---
+
+## 🔒 Multi-User Collaborative Production Roadmap (100% Free Setup)
+
+If you are looking to scale this board to a live website with **individual user login accounts**, **secured access controls**, and a **cloud-hosted database** without entering any credit card details, you should transition to the following free-tier stack:
+
+### 1. User Authentication (Login, Signup, & Social Auth)
+To easily add secure logins for your team completely for free, use:
+- **Clerk Auth (Free Tier)**:
+  - Free up to **10,000 monthly active users** with absolutely no credit card required.
+  - Gives you pre-built login, signup, and user-profile widgets.
+  - *Implementation:* Copy their Javascript snippet into `static/index.html` to lock down page access to authenticated team members, and verify JWT tokens in `board.py` on the API layer.
+- **Supabase Auth (Free Tier)**:
+  - 100% free with robust support for email/password and third-party login providers.
+
+### 2. Cloud Database Persistence (Centralized Storage)
+Since SQLite works locally in a single file, it's best to migrate to a centralized hosted cloud database so all coworkers write and sync to the exact same database.
+- **Supabase Postgres (Free Tier)**:
+  - Gives you a **dedicated, high-performance PostgreSQL cloud database for free** (no payment details required).
+  - *Implementation:* Change `get_connection()` inside `database.py` from `sqlite3` to connect to your Supabase PostgreSQL database URL using `psycopg2`.
+- **Turso (Free Tier)**:
+  - Free tier SQLite-in-the-cloud database with support for up to 500 databases and 9 billion reads.
+
+### 3. Server Hosting (WebSockets & APIs)
+To run your secure FastAPI backend with native WebSocket support 24/7:
+- **Hugging Face Spaces (Free Tier)**:
+  - Continually runs your Docker container with 100% free compute. It natively supports real-time WebSockets and doesn't experience "sleep-mode" latency!
+- **Render (Free Tier)**:
+  - Fast, direct GitHub deployment, but automatically sleeps after 15 minutes of inactivity (taking ~50s to wake up on the first request).
